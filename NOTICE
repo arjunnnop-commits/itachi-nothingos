@@ -1,0 +1,4 @@
+This is a port of NEESS-COS-AOD-FOD-FIX (originally for POCO X7 Pro / rodin)
+by NEESCHAL-3, adapted for POCO X6 Pro (duchamp). Licensed under Apache-2.0
+(see LICENSE); original copyright and license terms are retained.
+Renames: rodin -> duchamp, nees/neess/neeschal -> itachi.

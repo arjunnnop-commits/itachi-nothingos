@@ -1,0 +1,13 @@
+; ================================================================
+; POCO X6 Pro (Duchamp) FOD & AOD SELinux Rules (CIL Format)
+; Target file: /vendor/etc/selinux/vendor_sepolicy.cil
+; Mode: 100% Strict Enforcing (Zero Permissive Domains)
+; ================================================================
+
+; ===== Pure Strict Enforcing FOD Rules =====
+(allow hal_fingerprint_default sysfs_202404 (file (read open getattr)))
+(allow hal_fingerprint_default sysfs_202404 (dir (search read open)))
+(allow hal_fingerprint_default system_server_202404 (binder (call transfer)))
+(allow system_server_202404 hal_fingerprint_default (binder (call transfer)))
+(allow hal_fingerprint_default default_prop_202404 (file (read open getattr map)))
+(allow hal_fingerprint_default system_prop_202404 (file (read open getattr map)))

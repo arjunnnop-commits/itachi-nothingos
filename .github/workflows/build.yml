@@ -1,0 +1,49 @@
+name: build-itachi-duchamp
+on: [workflow_dispatch, push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - name: Tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake file
+      - name: Build AOD daemon
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
+        run: bash scripts/build_aod.sh
+      - name: Build FOD shim + icon helper
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
+        run: bash scripts/build_fod.sh
+      - name: Build sensor wrapper (sensors.mt6897.so)
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: bash sensor/build.sh
+      - name: Build Doze overlay (throwaway key, static RRO)
+        run: |
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          export PATH="$BT:$PATH"
+          AJ=$(ls -d $ANDROID_HOME/platforms/android-3[5-9]* | sort -V | tail -1)/android.jar
+          keytool -genkeypair -keystore rro.jks -alias rro -keyalg RSA -keysize 2048 -validity 10000 -storepass changeit -keypass changeit -dname "CN=itachi"
+          RRO_STORE_PASS=changeit RRO_KEY_PASS=changeit RRO_KEY_ALIAS=rro bash overlay/DuchampAodDozeOverlay/build.sh "$AJ" rro.jks out/DuchampAodDozeOverlay.apk
+      - name: Collect payload in repo layout
+        run: |
+          mkdir -p out/system/bin out/scripts/system/bin out/vendor/lib64/hw out/vendor/overlay
+          cp aod/target/aarch64-linux-android/release/itachi-duchamp-aodd out/system/bin/itachi_aodd
+          cp out/system/bin/itachi_aodd out/scripts/system/bin/itachi_aodd
+          cp system/bin/duchamp_fod_icon_prepare out/system/bin/
+          cp fod/native/build/libduchamp_fp_compat.so out/vendor/lib64/
+          cp sensor/build/sensors.mt6897.so out/vendor/lib64/hw/
+          cp out/DuchampAodDozeOverlay.apk out/vendor/overlay/
+          sha256sum out/system/bin/* out/vendor/lib64/*.so out/vendor/lib64/hw/*.so out/vendor/overlay/*.apk | tee out/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: itachi-duchamp-payload
+          path: out/

@@ -1,0 +1,5 @@
+# POCO X6 Pro (Duchamp) NothingOS FOD & AOD Optimizations
+ro.itachi.rom=nothing
+ro.itachi.fod.compat=1
+persist.vendor.sys.fp.fod.lhbmoffafterresult=1
+persist.sys.fp.fod.screenoff=true

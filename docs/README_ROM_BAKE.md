@@ -1,0 +1,176 @@
+# POCO X6 Pro (Duchamp) - ROM Bake-In Installer (TEST 4.0 Final)
+
+Native ColorOS AOD & Optical FOD Hardware Compatibility Layer for **POCO X6 Pro (Duchamp)**.
+
+This kit bakes all fixes directly into your unpacked ROM partitions (`system`, `vendor`, `odm`).
+**No root, Magisk, or KernelSU required** on the flashed device. Works 100% out-of-the-box on clean flash with **100% Pure Strict Enforcing SELinux** (zero permissive domains).
+
+---
+
+## Working features on current `main`
+
+| Feature | Result |
+| --- | --- |
+| FOD | Under-display fingerprint unlock across supported touch and FOD variants. |
+| SOFOD | Fingerprint unlock with the display off. |
+| SOFOD hint | Screen-off fingerprint icon appears when needed. |
+| Rise to wake | Gentle lifts wake the lock screen without breaking the SOFOD hint. |
+| AOD | All three ColorOS modes, including All day and Power saving. |
+
+Rise to wake was added after the `v4.0-working-final` tag. Use current `main` for this complete set of fixes.
+
+---
+
+## What's Included & Fixed in TEST 4.0 Final
+
+1. **Instant LHBM Off on Unlock (OEM Match)**:
+   - Immediately turns off Xiaomi optical LHBM spotlight (`setTouchFeature(0, 10, 0)`) the exact millisecond authentication succeeds.
+   - Prevents the optical highlight from lingering while the user holds their finger down after unlocking.
+2. **Lockscreen Dimming & Black Box Fixed**:
+   - Registers `vendor.oplus.hardware.displaypanelfeature.IDisplayPanelFeature/default` in ServiceManager.
+   - Evaluates `isLocalHBM = 410` (true), completely destroying `OnScreenFingerprintDimLayer` (full brightness lockscreen, zero black box).
+3. **DT_NEEDED ELF Baking**:
+   - Injects `libduchamp_fp_compat.so` into `/vendor/bin/hw/mfp-daemon` ELF headers via `patchelf`.
+   - Loaded automatically by the bionic dynamic linker at boot without `LD_PRELOAD`.
+4. **100% Pure Strict Enforcing SELinux**:
+   - Zero permissive domains (`typepermissive` completely removed).
+   - Full compliance with Google Play Integrity / CTS / banking apps.
+5. **Seamless & Classic AOD**:
+   - Full-day AOD and energy-saving modes supported without watchdog crashes.
+6. **Rise to Wake (ColorOS)**:
+   - The vendor sensor wrapper turns Xiaomi pickup events into the tilt events expected by ColorOS while preserving the screen-off fingerprint hint.
+   - Tested HAL SHA-256: `f9e74b38b50cd06f1764e95fb4de79852a3e1301a61024d564111afbbca3d14f`.
+7. **Touch and FOD hardware variants**:
+   - Goodix and FocalTech are touchscreen controller variants; Goodix and Jiiov are optical fingerprint sensor variants. Pairings include FocalTech + Goodix, FocalTech + Jiiov, Goodix + Goodix, and Goodix + Jiiov (touch + FOD). FOD operation is confirmed on a Jiiov-equipped Duchamp unit with the current build.
+
+---
+
+## How to Bake Into Your ROM
+
+### Prerequisites on Build Host
+- Linux / WSL
+- `patchelf` (`sudo apt install patchelf`)
+
+### Usage
+```bash
+chmod +x bake_into_rom.sh
+./bake_into_rom.sh /path/to/unpacked_rom_root
+```
+
+Example:
+```bash
+./bake_into_rom.sh /home/itachi/rom_work/unpacked
+```
+
+### What the Script Does Automatically:
+1. Installs `itachi_aodd` into `system/bin/itachi_aodd` (`0755`, `u:object_r:system_file:s0`).
+2. Installs `itachi_aodd.rc` into `system/etc/init/itachi_aodd.rc` (`0644`).
+3. Installs `libduchamp_fp_compat.so` into `vendor/lib64/libduchamp_fp_compat.so` (`0644`).
+4. Injects `DT_NEEDED: libduchamp_fp_compat.so` into `vendor/bin/hw/mfp-daemon` using `patchelf`.
+5. Installs `zz_duchamp_fp_compat.rc` into `vendor/etc/init/zz_duchamp_fp_compat.rc` (`0644`).
+6. Appends strict enforcing CIL rules to `vendor/etc/selinux/vendor_sepolicy.cil`.
+7. Appends `IDisplayPanelFeature` AIDL mapping to `vendor/etc/selinux/vendor_service_contexts` and `odm/etc/selinux/odm_service_contexts`.
+8. Safely renames stale `precompiled_sepolicy` so init compiles fresh CIL policy on first boot.
+9. Updates `plat_file_contexts` and `vendor_file_contexts` for image repackers (`erofs`/`ext4`).
+10. Appends optimized FOD/AOD properties to `system/build.prop`.
+11. Installs the tested `vendor/lib64/hw/sensors.mt6897.so` for Rise to wake and the screen-off fingerprint hint.
+12. Installs `vendor/overlay/DuchampAodDozeOverlay.apk` for the framework Doze service and light sensor mappings used by ColorOS AOD.
+
+The [Doze overlay source](../overlay/DuchampAodDozeOverlay/README.md) is included. On the current framework, `config_dozeComponent` and `config_displayLightSensorType` map successfully; `config_dozeAfterScreenOff` is absent and ignored. After flashing, verify with `adb shell cmd overlay dump com.duchamp.aoddoze.overlay`.
+
+---
+
+## How to Inspect SELinux Denials & Add Validated Strict CIL Rules
+
+When porting or modifying system components, never switch to permissive mode. Follow this exact workflow to identify denials and add clean, versioned CIL rules:
+
+### Step 1: Capture Audit Denials
+Run via ADB:
+```bash
+# Check kernel audit buffer
+adb shell "dmesg | grep avc"
+
+# Check logcat audit events
+adb shell "logcat -b all -d | grep -iE 'avc:  denied'"
+```
+
+### Step 2: Decode the Audit Denial
+Example denial message:
+```text
+type=1400 audit(...): avc:  denied  { read open getattr } for  comm="mfp-daemon" path="/sys/devices/virtual/touch/touch_dev/fod_enable" dev="sysfs" ino=1234 scontext=u:r:hal_fingerprint_default:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=0
+```
+
+Break down the components:
+* `scontext`: Calling domain (`hal_fingerprint_default`)
+* `tcontext`: Target object/domain (`sysfs`)
+* `tclass`: Object class (`file`, `dir`, `binder`, `service_manager`, `chr_file`, `property_service`)
+* `{ ... }`: The denied action(s) (`read`, `open`, `getattr`, `call`, `transfer`, `add`, `find`, `set`)
+
+### Step 3: Translate to Treble CIL Format
+In Treble-compliant vendor images (Android 14/15), system types referenced by vendor CIL files are versioned (e.g. `_202404`). 
+
+Check existing versioned symbols in your vendor image:
+```bash
+grep -E "\(type (sysfs_|system_server_|default_prop_)" /vendor/etc/selinux/vendor_sepolicy.cil
+```
+
+Construct the CIL allow rule:
+```cil
+(allow <scontext> <tcontext> (<tclass> (<actions...>)))
+```
+
+Examples of verified strict rules:
+```cil
+; File and directory access
+(allow hal_fingerprint_default sysfs_202404 (file (read open getattr)))
+(allow hal_fingerprint_default sysfs_202404 (dir (search read open)))
+
+; Binder IPC between HAL and system server
+(allow hal_fingerprint_default system_server_202404 (binder (call transfer)))
+(allow system_server_202404 hal_fingerprint_default (binder (call transfer)))
+
+; Property reading
+(allow hal_fingerprint_default default_prop_202404 (file (read open getattr map)))
+(allow hal_fingerprint_default system_prop_202404 (file (read open getattr map)))
+```
+
+### Step 4: Handle AIDL Services in ServiceManager
+When an AIDL service is added, `servicemanager` checks `service_contexts`.
+* If you assign the service to an existing authorized type:
+  In `/vendor/etc/selinux/vendor_service_contexts`:
+  ```text
+  vendor.oplus.hardware.displaypanelfeature.IDisplayPanelFeature/default u:object_r:vendor_hal_fingerprint_service_xiaomi:s0
+  ```
+  Because `vendor_hal_fingerprint_service_xiaomi` is already allowed to be added by `hal_fingerprint_default` and found by `platform_app_202404` (SystemUI) and `system_server_202404`, registration succeeds with **zero denials and zero extra CIL rules required**.
+
+### Step 5: Critical Treble Step — Neutralize the 3 `precompiled_sepolicy` Files in `/odm/etc/selinux` & `/vendor/etc/selinux`
+On modern Android Treble devices with dedicated vendor/odm partitions (like POCO X6 Pro / Duchamp running ColorOS ports), Android ships up to 3 precompiled SELinux policy artifacts:
+1. `precompiled_sepolicy`
+2. `precompiled_sepolicy.plat_sepolicy_and_mapping.sha256`
+3. `precompiled_sepolicy.*_sepolicy_and_mapping.sha256` (e.g. `system_ext` or `product`)
+
+**Why this is critical:** During early boot, Android `init` verifies whether the SHA256 hashes of the system partitions match the stored `.sha256` checksum files. If they match, `init` loads `precompiled_sepolicy` directly into the kernel and **completely ignores your edits to `vendor_sepolicy.cil` and `odm_sepolicy.cil`**! Any custom allow rules you added will never take effect.
+
+**The Professional Solution:**
+Remove or back up all 3 `precompiled_sepolicy*` files located in:
+* `/odm/etc/selinux/`
+* `/vendor/etc/selinux/`
+
+When these 3 files are neutralized, Android `init` detects that no valid precompiled policy exists and automatically invokes `/system/bin/secilc` at boot time to compile `plat_sepolicy.cil` + `vendor_sepolicy.cil` + `odm_sepolicy.cil` into a monolithic runtime policy, seamlessly activating all custom strict rules with zero bootloop risk.
+
+---
+
+After running the script, repack your `system.img`, `vendor.img`, `odm.img` (or `super.img`) and flash!
+
+---
+
+## Credits & Authors
+* **ITACHI** – Lead developer, hardware reverse engineering, protocol shims, and timing state machines.
+* Community testers for feedback and telemetry logs.
+
+---
+
+## License
+
+Licensed under the [Apache License, Version 2.0](../LICENSE).
+Copyright (c) 2026 ITACHI-3 and ITACHI-COS-AOD-FOD-FIX Contributors.

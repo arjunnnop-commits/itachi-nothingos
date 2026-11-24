@@ -1,0 +1,4 @@
+# POCO X6 Pro (Duchamp) FOD Compat Shim & Init Script
+/vendor/lib64/libduchamp_fp_compat\.so    u:object_r:vendor_file:s0
+/vendor/etc/init/zz_duchamp_fp_compat\.rc u:object_r:vendor_configs_file:s0
+/vendor/overlay/DuchampAodDozeOverlay\.apk u:object_r:vendor_overlay_file:s0

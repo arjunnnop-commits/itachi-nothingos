@@ -1,0 +1,74 @@
+# Changelog
+
+## 2026-11-05 - Fingerprint completion and ROM signing
+
+- Keep fingerprint capture disarmed after successful authentication across Goodix/Jiiov sensors and Goodix/FocalTech touch variants until a new lock or biometric operation.
+- Remove the synthetic post-success press and delayed finger-up timer; forward physical lift events immediately.
+- Prepare capture before dispatching the real HAL operation, so an immediate success callback cannot be followed by a stale re-arm.
+- Check the native Xiaomi extension reply status when changing capture conditions.
+- Align the bundled verifier with the maintained signing key. Re-sign the final installed components after updating either binary.
+
+## 2026-11-05 - AOD brightness ordering
+
+- Cancel delayed AOD brightness recovery after a newer fingerprint or wake request.
+- Serialize panel writes and recheck request ownership after the power-state query, preventing stale requests from overwriting newer brightness decisions.
+
+## 2026-11-05 - Custom fingerprint icons
+
+- Fix custom fingerprint icons saving in Settings but showing the default on the lock screen.
+- Preserve saved images across reboot and assign native icon storage to each user’s SystemUI UID.
+- Repair the conflicting performance init directory permission without making the directory world-writable.
+
+## 2026-09-27 - Jiiov FOD idle-touch fix
+
+- On Jiiov FOD, disarm idle screen-on fingerprint touch after unlock to prevent stray LHBM illumination; re-arm for screen-off use or a new biometric operation. Goodix FOD retains its previous behavior.
+- Update the tracked Duchamp FOD library to the tested build. Installed SHA-256: `b6f4f8cee751d122bd5fe04455584e629d497fcc8d7bc8ebefb9d29e29bc20d1`.
+- Refresh the ITACHI4 signature for the current sensor HAL, AOD daemon, FOD library, and system property file on the installed ROM; verification passes after reboot.
+
+## 2026-09-27 - Duchamp AOD Doze overlay source
+
+- Reconstructed the static framework RRO source from the installed `/vendor/overlay/DuchampAodDozeOverlay.apk` and included the known-working APK in the ROM bake inputs.
+- Bake the overlay into `/vendor/overlay/` and label it `vendor_overlay_file`.
+- Confirmed `config_dozeComponent` and `config_displayLightSensorType` are mapped. The APK's `config_dozeAfterScreenOff` has no matching resource in the current framework, so it is not active.
+
+## 2026-09-27 - Duchamp FOD hardware compatibility
+
+- Confirmed FOD operation on a Duchamp unit with a Jiiov fingerprint sensor using the current build.
+- Documented touchscreen controller and FOD sensor as separate hardware components: Goodix or FocalTech touch, and Goodix or Jiiov FOD. No Jiiov-specific source branch was required.
+
+## 2026-09-27 - Rise to wake on Duchamp ColorOS
+
+- Route ColorOS tilt sensor requests to Xiaomi pickup with the required batch-before-activate sequence.
+- Deliver pickup events as tilt value `0` so `ScreenOffGestureService` wakes the display on gentle lifts.
+- Preserve native FOD, AOD, significant motion, and hand sensor requests and events, keeping the screen-off fingerprint hint functional.
+- Update the tracked `vendor/lib64/hw/sensors.mt6897.so` used by `bake_into_rom.sh` to the tested build.
+- Tested three consecutive gentle lock-and-lift cycles on the installed vendor HAL.
+- Installed sensor HAL SHA-256: `f9e74b38b50cd06f1764e95fb4de79852a3e1301a61024d564111afbbca3d14f`.
+
+## ITACHI4 V2 - final tested development state
+
+### Added
+
+- shared ITACHI4 signed authorization
+- volatile `sys.itachi4.authorized` handoff
+- asynchronous DisplayPanelFeature registration
+- unauthorized FOD pass-through behavior
+- pending physical FOD DOWN replay
+- physical UP cleanup while listener is disabled
+
+### Fixed
+
+- immediate-lock FOD dead state
+- stale physical-down/session state
+- post-unlock over-brightness
+- all-day AOD capability negotiation
+- startup failure caused by fork/exec verification inside `mfp-daemon`
+
+### Tested hashes
+
+```text
+AOD_DAEMON_SHA256=3e48477816c5025027c5eace3e4e874ad81650aa105a4e4579ee3f6082329a1a
+FOD_COMPAT_SHA256=e0e74932acc4eb79345343aa77f40c965a92606098e2f3b11229e4b348aeaffa
+SENSOR_HAL_SHA256=4f21537899e0ad9bd6de3722d77172c63f82c0a1ce831f2f88468588b68f6cb8
+SYSTEM_BUILD_PROP_SHA256=428572644483493dbacd16a278666a2b3e5be4e4756c80fbad4e07128706169e
+```

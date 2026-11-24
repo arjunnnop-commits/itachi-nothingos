@@ -1,0 +1,87 @@
+# Build output
+**/build/
+**/target/
+*.o
+*.so
+!vendor/lib64/*.so
+!vendor/lib64/**/*.so
+*.a
+
+# Private signing material
+*.pem
+*.key
+*.p12
+*.pfx
+itachi_duchamp_private.pem
+**/ITACHI-DUCHAMP-AUTH/**
+**/private/**
+
+# Signing work products
+signature.bin
+auth.txt
+manifest.txt
+ITACHI4-SHARED-FINAL*/
+build.prop.current
+build.prop.itachi4*
+system.build.prop.live
+
+# Device dumps / local backups
+*.img
+*.dump
+*.bak
+*.backup
+*.pre-*
+*.before-*
+logcat*
+tombstone*
+core
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Signing secrets / local signing output
+*.pem
+*.key
+*.p12
+*.pfx
+signing/keys/
+out/signing/
+
+# Local audits, test dumps, overlays
+*-audit/
+*-AUDIT/
+*-jadx/
+*-smali*/
+*-cn/
+*-cn.apk
+*-live.apk
+*.opex
+*.txt
+*.dex
+*.apk
+*.idsig
+*.keystore
+boot-fail-*/
+CTS-*/
+APPSTART-*/
+NET-*/
+Itachi*/
+Evonix*/
+com.oplus.*.xml
+nav-ui*.xml
+itachi-google-ai*
+release/
+Itachi*.rc
+
+# Python patcher bytecode
+__pycache__/
+*.pyc
+!**/CMakeLists.txt
+!signing/manifest.example.txt
+!vendor/overlay/
+!vendor/overlay/*.apk
+!docs/reference/
+!docs/reference/**
